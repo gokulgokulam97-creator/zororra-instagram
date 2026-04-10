@@ -2,6 +2,7 @@
 """
 Zororra Instagram Auto Poster
 - Generates caption + image using Google Gemini
+- Uploads to Cloudinary
 - Posts to Instagram via Graph API
 - Runs daily via GitHub Actions
 """
@@ -12,6 +13,7 @@ import json
 import random
 import base64
 import time
+import hashlib
 import requests
 from datetime import datetime
 from google import genai
@@ -23,6 +25,9 @@ from io import BytesIO
 GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
 INSTAGRAM_ACCESS_TOKEN = os.environ["INSTAGRAM_ACCESS_TOKEN"]
 INSTAGRAM_USER_ID = os.environ["INSTAGRAM_USER_ID"]
+CLOUDINARY_CLOUD_NAME = os.environ["CLOUDINARY_CLOUD_NAME"]
+CLOUDINARY_API_KEY = os.environ["CLOUDINARY_API_KEY"]
+CLOUDINARY_API_SECRET = os.environ["CLOUDINARY_API_SECRET"]
 
 # === PRODUCT INFO ===
 PRODUCT = {
@@ -191,16 +196,25 @@ def generate_image(style_info):
 
 
 def upload_image_to_hosting(image_bytes):
-    """Upload image to Telegraph for a public URL (no API key needed)."""
+    """Upload image to Cloudinary for a public URL."""
+    timestamp = str(int(time.time()))
+    signature_string = f"timestamp={timestamp}{CLOUDINARY_API_SECRET}"
+    signature = hashlib.sha1(signature_string.encode()).hexdigest()
+
     files = {"file": ("post.jpg", BytesIO(image_bytes), "image/jpeg")}
-    response = requests.post("https://telegra.ph/upload", files=files)
+    data = {
+        "api_key": CLOUDINARY_API_KEY,
+        "timestamp": timestamp,
+        "signature": signature,
+    }
+
+    response = requests.post(
+        f"https://api.cloudinary.com/v1_1/{CLOUDINARY_CLOUD_NAME}/image/upload",
+        files=files,
+        data=data,
+    )
     response.raise_for_status()
-
-    result = response.json()
-    if isinstance(result, list) and len(result) > 0 and "src" in result[0]:
-        return "https://telegra.ph" + result[0]["src"]
-
-    raise Exception(f"Image upload failed: {result}")
+    return response.json()["secure_url"]
 
 
 def post_to_instagram(image_url, caption):
@@ -259,8 +273,8 @@ def main():
     image_bytes = generate_image(style)
     print(f"Image generated: {len(image_bytes)} bytes")
 
-    # 4. Upload image to get public URL
-    print("\nUploading image...")
+    # 4. Upload image to Cloudinary
+    print("\nUploading image to Cloudinary...")
     image_url = upload_image_to_hosting(image_bytes)
     print(f"Image URL: {image_url}")
 
