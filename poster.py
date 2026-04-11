@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
 Zororra Instagram Auto Poster
-- Generates caption + image using Google Gemini
-- Uploads to Cloudinary
+- Downloads real product image from Cloudinary
+- Sends it to Gemini to create scenes around the real product
+- Uploads final image to Cloudinary
 - Posts to Instagram via Graph API
 - Runs daily via GitHub Actions
 """
@@ -29,6 +30,9 @@ CLOUDINARY_CLOUD_NAME = os.environ["CLOUDINARY_CLOUD_NAME"]
 CLOUDINARY_API_KEY = os.environ["CLOUDINARY_API_KEY"]
 CLOUDINARY_API_SECRET = os.environ["CLOUDINARY_API_SECRET"]
 
+# === REAL PRODUCT IMAGE URL ===
+PRODUCT_IMAGE_URL = "https://res.cloudinary.com/dt3vzadez/image/upload/v1775866611/azmdnpf4qbqlcz1m0kay.png"
+
 # === PRODUCT INFO ===
 PRODUCT = {
     "name": "AshwaCalm+ KSM-66",
@@ -51,72 +55,72 @@ PRODUCT = {
 POST_STYLES = [
     {
         "style": "Lifestyle - Calm Morning",
-        "image_prompt": "A serene, photorealistic scene of a stylish woman in her 30s sitting cross-legged on a soft white bed in golden morning light, holding a premium dark supplement bottle with a calm smile. Minimalist Scandinavian bedroom, warm tones, soft bokeh. The bottle has a sleek matte black label. Professional product photography style, 4K quality.",
+        "image_prompt": "Place this exact product (do NOT change anything about the product — keep the label, shape, colors, and all details exactly the same) into a serene morning scene: a stylish woman in her 30s sitting cross-legged on a soft white bed in golden morning light, holding this exact product bottle with a calm smile. Minimalist Scandinavian bedroom, warm tones, soft bokeh. Professional product photography style, 4K quality. The product must look exactly as provided — no modifications.",
         "caption_angle": "morning routine / starting the day calm",
     },
     {
         "style": "Lifestyle - After Workout",
-        "image_prompt": "A photorealistic image of an athletic man in his late 20s in a modern gym, relaxed after a workout, holding a premium dark supplement bottle. He looks calm and focused. Clean modern gym background with soft lighting, slight sweat glow. Professional fitness photography, cinematic lighting.",
+        "image_prompt": "Place this exact product (do NOT change anything about the product — keep the label, shape, colors, and all details exactly the same) into a gym scene: an athletic man in his late 20s in a modern gym, relaxed after a workout, holding this exact product bottle. He looks calm and focused. Clean modern gym background with soft lighting. Professional fitness photography, cinematic lighting. The product must look exactly as provided.",
         "caption_angle": "post-workout recovery and stress relief",
     },
     {
         "style": "Educational - Science",
-        "image_prompt": "A stunning, modern infographic-style image about ashwagandha and cortisol reduction. Show a beautiful botanical illustration of the ashwagandha plant alongside a simple graph showing cortisol going down. Dark luxury background with gold and green accents. Clean typography space at the top. Premium health brand aesthetic.",
+        "image_prompt": "Create a stunning, modern infographic-style image featuring this exact product (do NOT change anything about it). Place the product prominently on the right side. On the left, show a beautiful botanical illustration of the ashwagandha plant alongside a simple graph showing cortisol going down. Dark luxury background with gold and green accents. Premium health brand aesthetic. The product must look exactly as provided — no modifications.",
         "caption_angle": "the science behind KSM-66 ashwagandha and cortisol reduction",
     },
     {
         "style": "Lifestyle - Evening Wind Down",
-        "image_prompt": "A photorealistic cozy evening scene: a woman's hand holding a premium dark supplement bottle next to a cup of herbal tea on a marble side table. Warm ambient lighting, candles in the background, soft blanket texture visible. Luxury lifestyle photography, moody golden tones, shallow depth of field.",
+        "image_prompt": "Place this exact product (do NOT change anything about it) into a cozy evening scene: the product bottle next to a cup of herbal tea on a marble side table. Warm ambient lighting, candles in the background, soft blanket texture visible. Luxury lifestyle photography, moody golden tones, shallow depth of field. The product must look exactly as provided.",
         "caption_angle": "evening self-care ritual and better sleep",
     },
     {
         "style": "Motivational - Mental Clarity",
-        "image_prompt": "A photorealistic image of a focused professional woman at a clean minimalist desk with a laptop, a premium dark supplement bottle placed elegantly beside her. She looks calm and in control. Soft natural window light, modern office aesthetic, warm neutral tones. Professional brand photography.",
+        "image_prompt": "Place this exact product (do NOT change anything about it) into a workspace scene: a focused professional woman at a clean minimalist desk with a laptop, this exact product bottle placed elegantly beside her. She looks calm and in control. Soft natural window light, modern office aesthetic, warm neutral tones. Professional brand photography. The product must look exactly as provided.",
         "caption_angle": "mental clarity and focus during a busy workday",
     },
     {
         "style": "Product Hero - Dark Luxury",
-        "image_prompt": "A stunning product photography shot of a premium dark matte supplement bottle on a black marble surface. Dramatic side lighting creating elegant shadows. Gold and emerald green accents. Scattered ashwagandha root pieces and green leaves artfully placed around the bottle. Ultra-luxury beauty brand aesthetic, 4K, cinematic.",
+        "image_prompt": "Place this exact product (do NOT change anything about it) as the hero on a black marble surface. Dramatic side lighting creating elegant shadows. Gold and emerald green accents. Scattered ashwagandha root pieces and green leaves artfully placed around the product. Ultra-luxury beauty brand aesthetic, 4K, cinematic. The product must look exactly as provided — no modifications to label, shape, or colors.",
         "caption_angle": "premium quality and natural ingredients",
     },
     {
         "style": "Lifestyle - Nature Connection",
-        "image_prompt": "A photorealistic scene of a person meditating outdoors in a lush green garden at sunrise, a premium dark supplement bottle placed on a wooden surface nearby. Dewy morning atmosphere, rays of golden light through trees. Earthy, natural wellness aesthetic. Professional lifestyle photography.",
+        "image_prompt": "Place this exact product (do NOT change anything about it) into a nature scene: the product placed on a wooden surface near a person meditating outdoors in a lush green garden at sunrise. Dewy morning atmosphere, rays of golden light through trees. Earthy, natural wellness aesthetic. Professional lifestyle photography. The product must look exactly as provided.",
         "caption_angle": "connecting with nature and inner calm",
     },
     {
         "style": "Educational - Benefits List",
-        "image_prompt": "A beautiful, modern graphic design layout with a dark luxury background. Show 5 minimalist icons representing: sleep, stress, focus, energy, calm — arranged in a clean grid. Gold and green color palette. Premium health brand aesthetic. Space for text overlay at top and bottom. Clean, editorial magazine style.",
+        "image_prompt": "Create a beautiful, modern graphic design layout featuring this exact product (do NOT change anything about it) in the center. Dark luxury background. Show 5 minimalist gold icons around the product representing: sleep, stress relief, focus, energy, calm. Gold and green color palette. Premium health brand aesthetic. Clean, editorial magazine style. The product must look exactly as provided.",
         "caption_angle": "5 key benefits of AshwaCalm+ for daily wellness",
     },
     {
         "style": "Social Proof - Testimonial",
-        "image_prompt": "A photorealistic image of a happy, relaxed couple in their 30s laughing together in a beautiful kitchen, a premium dark supplement bottle visible on the counter. Warm, natural lighting. They look genuinely content and stress-free. Modern lifestyle photography, candid feel, warm tones.",
+        "image_prompt": "Place this exact product (do NOT change anything about it) into a lifestyle scene: a happy, relaxed couple in their 30s laughing together in a beautiful kitchen, this exact product bottle visible on the counter. Warm, natural lighting. They look genuinely content and stress-free. Modern lifestyle photography, candid feel. The product must look exactly as provided.",
         "caption_angle": "real results and transformation stories",
     },
     {
         "style": "Lifestyle - Travel Calm",
-        "image_prompt": "A photorealistic flat-lay of travel essentials on a white marble surface: passport, sunglasses, a premium dark supplement bottle, a journal, and a boarding pass. Bright natural lighting from above, clean composition. Premium travel lifestyle aesthetic, Instagram-worthy arrangement.",
+        "image_prompt": "Create a photorealistic flat-lay featuring this exact product (do NOT change anything about it) alongside travel essentials on a white marble surface: passport, sunglasses, a journal, and a boarding pass arranged around the product. Bright natural lighting from above, clean composition. Premium travel lifestyle aesthetic. The product must look exactly as provided.",
         "caption_angle": "staying calm and balanced while traveling",
     },
     {
         "style": "Problem-Solution",
-        "image_prompt": "A split-image concept: left side shows a stressed person in chaotic city environment with grey desaturated tones, right side shows the same scene but the person is calm, colors are warm and golden, holding a premium dark supplement bottle. Dramatic before-after visual storytelling. Professional photography.",
+        "image_prompt": "Create a split-image concept featuring this exact product (do NOT change anything about it): left side shows a stressed person in chaotic city environment with grey desaturated tones, right side shows the same person calm and smiling, holding this exact product, colors warm and golden. Dramatic before-after visual storytelling. The product must look exactly as provided.",
         "caption_angle": "from stressed to blessed — solving modern stress",
     },
     {
         "style": "Educational - Ingredient Spotlight",
-        "image_prompt": "A photorealistic close-up of fresh ashwagandha roots and leaves arranged beautifully on a dark slate surface, with a premium dark supplement bottle in the background slightly out of focus. Droplets of water on the roots. Botanical photography style, rich earthy tones, macro detail. Premium natural supplement aesthetic.",
+        "image_prompt": "Place this exact product (do NOT change anything about it) in the background (slightly out of focus) behind a beautiful close-up arrangement of fresh ashwagandha roots and leaves on a dark slate surface. Droplets of water on the roots. Botanical photography style, rich earthy tones, macro detail. Premium natural supplement aesthetic. The product must look exactly as provided.",
         "caption_angle": "deep dive into KSM-66 — the gold standard of ashwagandha",
     },
     {
         "style": "Lifestyle - Self Care Sunday",
-        "image_prompt": "A photorealistic overhead shot of a luxurious self-care setup: bath with flower petals, candles, a silk robe, skincare products, and a premium dark supplement bottle artfully placed. Soft pink and gold tones, steam rising. Luxury wellness spa aesthetic, magazine-quality photography.",
+        "image_prompt": "Place this exact product (do NOT change anything about it) into a luxurious self-care overhead shot: bath with flower petals, candles, a silk robe, skincare products, and this exact product bottle artfully placed among them. Soft pink and gold tones, steam rising. Luxury wellness spa aesthetic, magazine-quality photography. The product must look exactly as provided.",
         "caption_angle": "self-care Sunday featuring AshwaCalm+",
     },
     {
         "style": "Bold Quote Card",
-        "image_prompt": "A premium dark background with a powerful bold quote in elegant serif typography: 'Calm is a superpower'. Minimal gold line accents. A small premium dark supplement bottle subtly placed in the bottom corner. High-end brand poster aesthetic, clean and impactful. Magazine advertisement quality.",
+        "image_prompt": "Create a premium dark background with a powerful bold quote in elegant serif typography: 'Calm is a superpower'. Minimal gold line accents. Place this exact product (do NOT change anything about it) subtly in the bottom right corner. High-end brand poster aesthetic, clean and impactful. Magazine advertisement quality. The product must look exactly as provided.",
         "caption_angle": "inspirational message about the power of calm",
     },
 ]
@@ -126,6 +130,15 @@ def get_today_style():
     """Pick a style based on the day of year — cycles through all styles."""
     day_of_year = datetime.now().timetuple().tm_yday
     return POST_STYLES[day_of_year % len(POST_STYLES)]
+
+
+def download_product_image():
+    """Download the real product image from Cloudinary."""
+    print(f"Downloading product image from: {PRODUCT_IMAGE_URL}")
+    response = requests.get(PRODUCT_IMAGE_URL)
+    response.raise_for_status()
+    print(f"Product image downloaded: {len(response.content)} bytes")
+    return response.content
 
 
 def generate_caption(style_info):
@@ -165,21 +178,27 @@ Write ONLY the caption text. Nothing else."""
     return response.text.strip()
 
 
-def generate_image(style_info):
-    """Use Gemini to generate a product image."""
+def generate_image(style_info, product_image_bytes):
+    """Use Gemini to generate a scene with the real product image."""
     client = genai.Client(api_key=GEMINI_API_KEY)
 
-    prompt = style_info["image_prompt"]
+    # Detect image format
+    img = Image.open(BytesIO(product_image_bytes))
+    mime_type = "image/png" if img.format == "PNG" else "image/jpeg"
 
+    # Send the real product image + prompt to Gemini
     response = client.models.generate_content(
         model="gemini-2.5-flash-image",
-        contents=prompt,
+        contents=[
+            types.Part.from_bytes(data=product_image_bytes, mime_type=mime_type),
+            types.Part.from_text(style_info["image_prompt"]),
+        ],
         config=types.GenerateContentConfig(
             response_modalities=["IMAGE", "TEXT"],
         ),
     )
 
-    # Extract the image from the response
+    # Extract the generated image
     for part in response.candidates[0].content.parts:
         if hasattr(part, "inline_data") and part.inline_data:
             image_data = part.inline_data.data
@@ -263,22 +282,26 @@ def main():
     print(f"\nToday's style: {style['style']}")
     print(f"Angle: {style['caption_angle']}")
 
-    # 2. Generate caption
+    # 2. Download real product image
+    print("\nDownloading product image...")
+    product_image = download_product_image()
+
+    # 3. Generate caption
     print("\nGenerating caption with Gemini...")
     caption = generate_caption(style)
     print(f"Caption preview: {caption[:100]}...")
 
-    # 3. Generate image
-    print("\nGenerating image with Gemini...")
-    image_bytes = generate_image(style)
+    # 4. Generate image using real product
+    print("\nGenerating scene with real product using Gemini...")
+    image_bytes = generate_image(style, product_image)
     print(f"Image generated: {len(image_bytes)} bytes")
 
-    # 4. Upload image to Cloudinary
+    # 5. Upload final image to Cloudinary
     print("\nUploading image to Cloudinary...")
     image_url = upload_image_to_hosting(image_bytes)
     print(f"Image URL: {image_url}")
 
-    # 5. Post to Instagram
+    # 6. Post to Instagram
     print("\nPosting to Instagram...")
     post_id = post_to_instagram(image_url, caption)
 
