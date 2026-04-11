@@ -184,15 +184,19 @@ def generate_image(style_info, product_image_bytes):
 
     # Detect image format
     img = Image.open(BytesIO(product_image_bytes))
-    mime_type = "image/png" if img.format == "PNG" else "image/jpeg"
+    if img.format == "PNG":
+        mime_type = "image/png"
+    else:
+        mime_type = "image/jpeg"
+
+    # Build the content parts
+    image_part = types.Part.from_bytes(data=product_image_bytes, mime_type=mime_type)
+    text_part = style_info["image_prompt"]
 
     # Send the real product image + prompt to Gemini
     response = client.models.generate_content(
         model="gemini-2.5-flash-image",
-        contents=[
-            types.Part.from_bytes(data=product_image_bytes, mime_type=mime_type),
-            types.Part.from_text(style_info["image_prompt"]),
-        ],
+        contents=[image_part, text_part],
         config=types.GenerateContentConfig(
             response_modalities=["IMAGE", "TEXT"],
         ),
